@@ -1,0 +1,70 @@
+version: "3.3"
+
+services:
+  traefik:
+    image: traefik:v2.1
+    container_name: "traefik"
+    command:
+        - --configFile=/static.yaml # Initial config from static.yml file
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro" # Docker deamon volume
+      - "./letsencrypt:/letsencrypt" # Shared file with certs in json file (read and write)
+      - "./traefik/static.yaml:/static.yaml" # Initial static config
+      - "./traefik/dynamic.yaml:/etc/traefik/dynamic.yaml" # Dynamic config (min tls version and sniStrict)
+    labels:
+      # Traefik label
+      - "traefik.enable=true"
+      
+      # Redirect to https Middleware
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      
+      # Security headers middleware
+      - "traefik.http.middlewares.security-headers.headers.stsSeconds=31536000" # 1 año
+      - "traefik.http.middlewares.security-headers.headers.stsPreload=true"
+      - "traefik.http.middlewares.security-headers.headers.forceSTSHeader=true"
+      - "traefik.http.middlewares.security-headers.headers.stsIncludeSubdomains=true"   
+      
+      # Rules and middlewares asociation with entrypoints
+      - "traefik.http.routers.http-catchall.rule=hostregexp(`{host:.+}`)" # Catchs all request
+      - "traefik.http.routers.http-catchall.entrypoints=web" # Http middleware for web (http) entrypoint (see static.yaml file)
+      - "traefik.http.routers.http-catchall.middlewares=redirect-to-https,security-headers" # Add redirect and security middlewares
+      - "traefik.http.routers.https-catchall.rule=hostregexp(`{host:.+}`)" # Catchs all request
+      - "traefik.http.routers.https-catchall.entrypoints=websecure" # Http middleware for websecure (https) entrypoint (see static.yaml file)
+      - "traefik.http.routers.https-catchall.middlewares=security-headers" # add security middleware
+
+      # Secure Dashboard (http basic auth) just with localhost
+      - traefik.http.routers.traefik.rule=Host(`traefik.localhost`)
+      - traefik.http.routers.traefik.service=api@internal
+      - traefik.http.routers.traefik.middlewares=admin
+      - traefik.http.routers.traefik.entrypoints=web
+      
+      # Basic auth for dashboard - user admin password admin
+      # Use [ echo $(htpasswd -nb user password) | sed -e s/\\$/\\$\\$/g ] to generate new password
+      - traefik.http.middlewares.admin.basicauth.users=admin:$$apr1$$SAMaaHjX$$ZCo51QWKtqCOzrfaSZxwc1
+  my-app:
+    image: "containous/whoami"
+    container_name: "my-app"
+    labels:
+      # Traefik label
+      - "traefik.enable=true"
+      
+      # Asociates router with your specific domain or subdomain and websecure (https)
+      - "traefik.http.routers.my-app.rule=Host(`your.domain.goes.here)"
+      - "traefik.http.routers.my-app.entrypoints=websecure"
+      
+      # Enables tls
+      # If theres is no cert for the domain or subdomain traefik creates it and save it to json in shared volume
+      # If any cert is to be expired, traefik creates a new one too
+      - "traefik.http.routers.my-app.tls=true"
+      
+      # Asociation with resolver (see static.yml file)
+      - "traefik.http.routers.my-app.tls.certresolver=resolver"
+      
+      # add security middleware
+      - "traefik.http.routers.my-app.middlewares=security-headers"
+      
+      # Set default options (see dynamic.yaml for this)
+      - "traefik.http.routers.my-app.tls.options=default"

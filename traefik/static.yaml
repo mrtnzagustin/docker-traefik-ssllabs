@@ -1,0 +1,20 @@
+entryPoints:
+  web:
+    address: :80
+  websecure:
+    address: :443
+providers:
+  docker: # Enables docker to be a provider from its labels
+    exposedByDefault: false # Not expose by default docker containers
+  file: # Reads all files located in /etc/traefik/*
+    watch: true
+    directory: "/etc/traefik/"
+certificatesResolvers: # Certs handler/resolver
+  resolver:
+    acme:
+      email: your.mail@your.domain.com
+      storage: "/letsencrypt/acme.json"
+      tlsChallenge: true
+api: # Enables traefik ui dashboard and api
+  insecure: false
+  dashboard: true
