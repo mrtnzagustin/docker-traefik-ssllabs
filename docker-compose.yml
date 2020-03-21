@@ -52,7 +52,7 @@ services:
       - "traefik.enable=true"
       
       # Asociates router with your specific domain or subdomain and websecure (https)
-      - "traefik.http.routers.my-app.rule=Host(`your.domain.goes.here)"
+      - "traefik.http.routers.my-app.rule=Host(`your.domain.goes.here`)"
       - "traefik.http.routers.my-app.entrypoints=websecure"
       
       # Enables tls
